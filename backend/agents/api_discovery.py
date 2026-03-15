@@ -10,6 +10,7 @@ for deterministic / hardcoded API calling.
 """
 
 import json
+import os
 import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
@@ -128,9 +129,16 @@ def _make_api_caller(
             query_params["_t"] = str(int(time.time() * 1000))
 
         url = url_template
+        
+        # Inject API Key automatically (skip for signup route)
+        headers = {}
+        if not url.endswith("/signup"):
+            api_key = os.getenv("CAMPAIGNX_API_KEY", "")
+            if api_key:
+                headers["X-API-Key"] = api_key
 
         try:
-            with httpx.Client(timeout=30.0) as client:
+            with httpx.Client(timeout=30.0, headers=headers) as client:
                 if method.upper() == "GET":
                     resp = client.get(url, params=query_params)
                 elif method.upper() == "POST":

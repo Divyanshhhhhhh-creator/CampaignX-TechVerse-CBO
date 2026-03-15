@@ -1,0 +1,134 @@
+"""
+Phase 4 Standalone Tests — No langgraph dependency needed.
+Tests the optimizer agent core logic and micro-segment identification.
+Run from backend/: python tests/test_optimizer_standalone.py
+"""
+
+import sys
+import os
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+from simulator import (
+    evaluate_campaign,
+    generate_mock_recipients,
+    simulate_campaign,
+    OPTIMIZATION_THRESHOLD,
+    MAX_ITERATIONS,
+)
+from agents.optimizer import (
+    identify_micro_segments,
+    generate_optimization_directives,
+    optimizer_node,
+    _generate_sub_segments,
+)
+
+
+def test_sub_segment_generation():
+    recipients = generate_mock_recipients(100, "all")
+    sub_segments = _generate_sub_segments("all", recipients)
+    segments_found = set(r["segment"] for r in sub_segments)
+    assert len(segments_found) > 1, f"Expected multiple sub-segments, got {len(segments_found)}"
+    print(f"  OK Sub-segments generated: {segments_found}")
+
+
+def test_micro_segment_identification():
+    recipients = generate_mock_recipients(100, "all")
+    sub_segments = _generate_sub_segments("all", recipients)
+
+    report = simulate_campaign("test_seg_001", sub_segments, iteration=1, seed=42)
+    micro_segments = identify_micro_segments(report, sub_segments)
+
+    assert len(micro_segments) > 0
+    # Check sorting (worst first)
+    for i in range(len(micro_segments) - 1):
+        assert micro_segments[i]["weighted_score"] <= micro_segments[i + 1]["weighted_score"]
+
+    print(f"  OK Micro-segments: {len(micro_segments)} detected, sorted correctly")
+    for seg in micro_segments:
+        name = seg["segment"]
+        score = seg["weighted_score"]
+        status = seg["status"]
+        print(f"      {name}: score={score:.4f} ({status})")
+
+
+def test_optimization_directives():
+    micro_segments = [
+        {"segment": "female_seniors", "open_rate": 0.15, "click_rate": 0.05,
+         "weighted_score": 0.08, "status": "underperforming"},
+        {"segment": "young_professionals", "open_rate": 0.30, "click_rate": 0.12,
+         "weighted_score": 0.17, "status": "underperforming"},
+    ]
+    metrics = {
+        "open_rate": 0.28, "click_rate": 0.12, "weighted_score": 0.168,
+        "total_sent": 200, "total_opened": 56, "total_clicked": 24,
+    }
+
+    directives = generate_optimization_directives(micro_segments, metrics, iteration=2)
+    assert len(directives) > 0
+    assert "OPTIMIZATION ITERATION 2" in directives
+    assert "UNDERPERFORMING SEGMENTS" in directives
+    assert "TIMING ADJUSTMENT" in directives
+    print(f"  OK Directives: {len(directives)} chars, all keywords present")
+
+
+def test_max_iterations_cap():
+    state = {
+        "campaign_id": "test_003",
+        "plan": {"segment": "general"},
+        "recipient_emails": ["u@t.com"] * 50,
+        "iteration": MAX_ITERATIONS,
+        "optimization_history": [
+            {"iteration": i, "open_rate": 0.2, "click_rate": 0.08, "weighted_score": 0.116}
+            for i in range(1, MAX_ITERATIONS)
+        ],
+        "logs": [],
+        "errors": [],
+        "status": "executing",
+    }
+    result = optimizer_node(state)
+    assert result["optimization_action"] == "COMPLETE"
+    print(f"  OK Max iterations cap: COMPLETE at iteration {MAX_ITERATIONS}")
+
+
+def test_optimizer_decision():
+    state = {
+        "campaign_id": "test_004",
+        "plan": {"segment": "female_seniors"},
+        "recipient_emails": ["u@t.com"] * 80,
+        "iteration": 1,
+        "optimization_history": [],
+        "logs": [],
+        "errors": [],
+        "status": "executing",
+    }
+    result = optimizer_node(state)
+    action = result["optimization_action"]
+    score = result["metrics"]["weighted_score"]
+    assert action in ("REOPTIMIZE", "COMPLETE")
+    print(f"  OK Optimizer decision: {action} (score={score:.4f}, threshold={OPTIMIZATION_THRESHOLD})")
+
+
+if __name__ == "__main__":
+    print("=" * 60)
+    print("  Phase 4 — Autonomous Optimization Loop Tests")
+    print("=" * 60)
+
+    print("\n1. Sub-Segment Generation:")
+    test_sub_segment_generation()
+
+    print("\n2. Micro-Segment Identification:")
+    test_micro_segment_identification()
+
+    print("\n3. Optimization Directives:")
+    test_optimization_directives()
+
+    print("\n4. Max Iterations Cap:")
+    test_max_iterations_cap()
+
+    print("\n5. Optimizer Decision Logic:")
+    test_optimizer_decision()
+
+    print("\n" + "=" * 60)
+    print("  ALL PHASE 4 TESTS PASSED")
+    print("=" * 60)

@@ -43,8 +43,19 @@ class CampaignState(TypedDict, total=False):
     report: List[Dict[str, Any]]           # Raw report from get_report
     metrics: Dict[str, Any]                # Aggregated metrics
 
+    # ── Human-in-the-Loop ──
+    human_approved: bool                    # Whether human approved execution
+    scheduled_send_time: str                # Scheduled send time (ISO format)
+
+    # ── Optimization loop ──
+    optimization_history: List[Dict[str, Any]]  # Per-iteration metric snapshots
+    micro_segments: List[Dict[str, Any]]        # Identified micro-segments with status
+    optimization_directives: str                # Instructions for creative re-generation
+    optimization_action: str                    # "REOPTIMIZE" or "COMPLETE"
+
     # ── Pipeline control ──
     iteration: int                          # Optimization loop counter
     status: str                             # Current pipeline stage
+    active_node: str                        # Currently executing node name
     logs: List[Dict[str, str]]             # Agent reasoning trail
     errors: List[str]                       # Error messages
