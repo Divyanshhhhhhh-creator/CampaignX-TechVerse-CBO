@@ -1,0 +1,199 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "CampaignX SuperBFSI API",
+    "description": "API for managing email marketing campaigns, customer cohorts, and performance reports.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8000",
+      "description": "Local simulator (protects 100 req/day API limit)"
+    },
+    {
+      "url": "https://campaignx-api.superbfsi.com",
+      "description": "Production CampaignX API"
+    }
+  ],
+  "paths": {
+    "/api/v1/get_customer_cohort": {
+      "get": {
+        "operationId": "get_customer_cohort",
+        "summary": "Fetch the latest customer cohort for a given segment.",
+        "description": "Returns a list of customer records matching the specified segment. Always fetches the latest 'Test Phase' cohort data — do NOT cache results.",
+        "parameters": [
+          {
+            "name": "segment",
+            "in": "query",
+            "required": true,
+            "description": "Customer segment to filter (e.g., 'female_seniors', 'young_professionals', 'all')",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "no_cache",
+            "in": "query",
+            "required": false,
+            "description": "Set to 'true' to bypass any cached cohort data and fetch fresh results.",
+            "schema": {
+              "type": "string",
+              "default": "true"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Array of customer records",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cohort_id": {
+                      "type": "string",
+                      "description": "Unique identifier for this cohort snapshot"
+                    },
+                    "segment": {
+                      "type": "string"
+                    },
+                    "customers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": { "type": "string" },
+                          "email": { "type": "string", "format": "email" },
+                          "segment": { "type": "string" },
+                          "age": { "type": "integer" },
+                          "gender": { "type": "string" }
+                        }
+                      }
+                    },
+                    "total_count": {
+                      "type": "integer"
+                    },
+                    "fetched_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/send_campaign": {
+      "post": {
+        "operationId": "send_campaign",
+        "summary": "Schedule and send an email campaign to the specified recipients.",
+        "description": "Sends a campaign email with the given subject and body to a list of recipient emails. Returns a campaign_id for tracking.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["subject", "body", "recipient_emails"],
+                "properties": {
+                  "campaign_name": {
+                    "type": "string",
+                    "description": "Human-readable campaign name"
+                  },
+                  "subject": {
+                    "type": "string",
+                    "description": "Email subject line — English text only"
+                  },
+                  "body": {
+                    "type": "string",
+                    "description": "Email body — English text, emojis, and exactly one URL allowed"
+                  },
+                  "recipient_emails": {
+                    "type": "array",
+                    "items": { "type": "string", "format": "email" },
+                    "description": "List of recipient email addresses"
+                  },
+                  "segment": {
+                    "type": "string",
+                    "description": "Target segment identifier"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Campaign scheduled successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "campaign_id": { "type": "string" },
+                    "status": { "type": "string" },
+                    "recipients_count": { "type": "integer" },
+                    "scheduled_at": { "type": "string", "format": "date-time" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/get_report": {
+      "get": {
+        "operationId": "get_report",
+        "summary": "Get the performance report for a campaign.",
+        "description": "Returns an array of email events (EO = Email Open, EC = Email Click) for the specified campaign. Use this to evaluate campaign performance.",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "query",
+            "required": true,
+            "description": "Campaign ID to fetch the report for",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Array of email event entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "campaign_id": { "type": "string" },
+                      "email_id": { "type": "string" },
+                      "recipient": { "type": "string", "format": "email" },
+                      "event_type": {
+                        "type": "string",
+                        "enum": ["EO", "EC"],
+                        "description": "EO = Email Open, EC = Email Click"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": ["delivered", "opened", "clicked", "bounced"]
+                      },
+                      "timestamp": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

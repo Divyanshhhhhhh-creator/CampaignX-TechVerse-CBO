@@ -1,0 +1,14 @@
+{
+    "venvPath": "",
+    "pythonPath": "C:\\Python310\\python.exe",
+    "extraPaths": [
+        "."
+    ],
+    "reportMissingImports": false,
+    "executionEnvironments": [
+        {
+            "root": "backend",
+            "extraPaths": ["backend"]
+        }
+    ]
+}
