@@ -51,19 +51,49 @@ LAST_NAMES = [
 DOMAINS = ["superbfsi.in", "bankmail.co", "finserve.com", "trustmail.in"]
 
 
+import csv
+import os
+
 def generate_mock_recipients(
     count: int = 200,
     segment: Optional[str] = None,
     rng: Optional[random.Random] = None,
 ) -> List[Dict[str, Any]]:
     """
-    Create *count* fake email recipients.
+    Create *count* email recipients by sampling from the real customer cohort CSV.
+    Falls back to mock data if the CSV is not found.
 
     Returns:
         List of dicts with keys: ``name``, ``email``, ``segment``.
     """
     _rng = rng or random.Random()
     recipients: List[Dict[str, Any]] = []
+    
+    csv_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "customer_cohort_5000_v2.csv")
+    
+    try:
+        if os.path.exists(csv_path):
+            with open(csv_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                all_rows = list(reader)
+            
+            # Simple simulation: take a random sample from the real database
+            sampled_rows = _rng.sample(all_rows, min(count, len(all_rows)))
+            
+            for row in sampled_rows:
+                recipients.append({
+                    "name": row.get("Full_name", "Valued Customer"),
+                    "email": row.get("email", ""),
+                    "segment": segment or "general",
+                })
+            
+            # Pad with mocks if count > CSV rows
+            remaining = count - len(recipients)
+            count = remaining
+    except Exception as e:
+        print(f"Warning: Could not read CSV ({e}), falling back to purely mock data.")
+
+    # Fallback / Padding generator
     for _ in range(count):
         first = _rng.choice(FIRST_NAMES)
         last = _rng.choice(LAST_NAMES)
@@ -75,6 +105,7 @@ def generate_mock_recipients(
             "email": email,
             "segment": segment or "general",
         })
+        
     return recipients
 
 

@@ -77,27 +77,44 @@ def execution_node(state: CampaignState) -> Dict[str, Any]:
 
     subject = state.get("email_subject", "")
     recipients = state.get("recipient_emails", [])
-    send_time = state.get("scheduled_send_time", datetime.now(timezone.utc).isoformat())
+    
+    # Format STRICTLY as required: DD:MM:YY HH:MM:SS
+    formatted_send_time = datetime.now(timezone.utc).strftime("%d:%m:%y %H:%M:%S")
 
     logs.append({
         "agent": "execution",
         "action": "sending_campaign",
-        "detail": f"Sending '{subject[:50]}...' to {len(recipients)} recipients at {send_time}.",
+        "detail": f"Sending '{subject[:50]}...' to {len(recipients)} recipients at {formatted_send_time}.",
     })
 
-    # Simulated send result (in production, this would call the actual API)
-    send_result = {
-        "status": "sent",
-        "recipients_count": len(recipients),
-        "subject": subject,
-        "scheduled_send_time": send_time,
-        "message": f"Campaign sent to {len(recipients)} recipients successfully.",
-    }
+    api_tools = state.get("api_tools", {})
+    send_tool = api_tools.get("send_campaign")
+    
+    if send_tool:
+        try:
+            raw_res = send_tool.invoke({
+                "campaign_id": state.get("campaign_id", "demo_1"),
+                "segment_name": state.get("plan", {}).get("segment", "all"),
+                "email_subject": subject,
+                "email_body": state.get("email_body", ""),
+                "send_time": formatted_send_time,
+                "target_emails": recipients
+            })
+            send_result = {
+                "status": "sent", 
+                "api_response": raw_res, 
+                "scheduled_send_time": formatted_send_time,
+                "recipients_count": len(recipients)
+            }
+        except Exception as e:
+            send_result = {"status": "error", "reason": str(e)}
+    else:
+        send_result = {"status": "failed", "reason": "send_campaign tool missing from OpenAPI dynamically parsed tools."}
 
     logs.append({
         "agent": "execution",
         "action": "campaign_sent",
-        "detail": f"Campaign successfully sent to {len(recipients)} recipients. ✅",
+        "detail": f"Campaign execution status: {send_result.get('status')}. ✅",
     })
 
     return {

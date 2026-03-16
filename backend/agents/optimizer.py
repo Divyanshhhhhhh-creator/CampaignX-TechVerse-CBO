@@ -122,74 +122,33 @@ def generate_optimization_directives(
 ) -> str:
     """
     Produce actionable directives for the Creative Agent based on
-    micro-segment analysis and overall performance.
-
-    Returns a natural-language string to be injected into the creative brief.
+    micro-segment analysis and overall performance using the LLM.
     """
-    underperforming = [s for s in micro_segments if s["status"] == "underperforming"]
-
-    directives: List[str] = []
-    directives.append(
-        f"OPTIMIZATION ITERATION {iteration}: The previous campaign scored "
-        f"{metrics.get('weighted_score', 0):.4f} (threshold: {OPTIMIZATION_THRESHOLD}). "
-        f"The system needs improvement."
+    from langchain_core.messages import HumanMessage, SystemMessage
+    from langchain_google_genai import ChatGoogleGenerativeAI
+    import os
+    
+    sys_prompt = (
+        "You are the autonomous Analyst Agent for CampaignX. "
+        "Review the provided 70/30 heuristic metrics and micro-segment targets. "
+        "Output exactly 3 actionable, natural-language directives for the Creative Agent "
+        "to improve the Click-Through-Rate (CTR)."
     )
-
-    # Click rate focus (70% weight)
-    click_rate = metrics.get("click_rate", 0)
-    open_rate = metrics.get("open_rate", 0)
-
-    if click_rate < 0.15:
-        directives.append(
-            "CRITICAL: Click rate is very low. Make the CTA more prominent, "
-            "add urgency language, and emphasize exclusive benefits."
+    
+    try:
+        api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY", "dummy")
+        llm = ChatGoogleGenerativeAI(
+            model="gemini-2.0-flash", 
+            google_api_key=api_key, 
+            temperature=0.2
         )
-    elif click_rate < 0.25:
-        directives.append(
-            "Click rate needs improvement. Strengthen the value proposition "
-            "and make the CTA more compelling with action-oriented language."
-        )
-
-    if open_rate < 0.30:
-        directives.append(
-            "Open rate is below target. Rewrite the subject line to be more "
-            "intriguing, use personalization, and create curiosity gaps."
-        )
-
-    # Segment-specific directives
-    if underperforming:
-        seg_names = ", ".join(s["segment"] for s in underperforming[:3])
-        directives.append(
-            f"UNDERPERFORMING SEGMENTS: {seg_names}. "
-            f"Tailor content specifically for these demographics — adjust tone, "
-            f"value propositions, and emotional triggers."
-        )
-
-        for seg in underperforming[:2]:
-            if "senior" in seg["segment"].lower():
-                directives.append(
-                    f"For {seg['segment']}: Use reassuring, trust-building language. "
-                    f"Emphasize security, stability, and guaranteed features."
-                )
-            elif "young" in seg["segment"].lower():
-                directives.append(
-                    f"For {seg['segment']}: Use dynamic, aspirational language. "
-                    f"Emphasize growth potential and digital convenience."
-                )
-            elif "female" in seg["segment"].lower():
-                directives.append(
-                    f"For {seg['segment']}: Use empowering, confident language. "
-                    f"Emphasize independence and smart financial decisions."
-                )
-
-    # Send time adjustment
-    if iteration >= 2:
-        directives.append(
-            "TIMING ADJUSTMENT: Consider shifting send time by 2-3 hours "
-            "to catch recipients during peak engagement windows (10 AM or 7 PM)."
-        )
-
-    return "\n".join(directives)
+        response = llm.invoke([
+            SystemMessage(content=sys_prompt),
+            HumanMessage(content=f"Metrics: {metrics}. Micro-segments: {micro_segments}. Iteration: {iteration}")
+        ])
+        return response.content
+    except Exception as e:
+        return "Increase urgency and CTR focus on underperforming segments."
 
 
 # ─── Optimizer Agent Node ─────────────────────────────────────────────────────

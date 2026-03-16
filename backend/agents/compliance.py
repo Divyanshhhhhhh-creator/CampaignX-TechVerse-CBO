@@ -199,6 +199,11 @@ def compliance_node(state: CampaignState) -> Dict[str, Any]:
             "action": "approved",
             "detail": "Content passed all BFSI compliance checks. ✅",
         })
+        
+        disclaimer = "<p><small><i>*Disclaimer: SuperBFSI interest rates are subject to market risks. Read all scheme related documents carefully.</i></small></p>"
+        if disclaimer not in state.get("email_body", ""):
+            state["email_body"] = state.get("email_body", "") + f"\n\n{disclaimer}"
+            
     else:
         logs.append({
             "agent": "compliance",
@@ -207,6 +212,7 @@ def compliance_node(state: CampaignState) -> Dict[str, Any]:
         })
 
     return {
+        "email_body": state.get("email_body", ""),
         "compliance_approved": approved,
         "compliance_issues": all_issues,
         "compliance_retries": retries + 1,
